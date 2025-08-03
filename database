@@ -1,0 +1,67 @@
+import wixData from 'wix-data';
+
+// Example: Read data from the collection
+$w.onReady(function () {
+  wixData.query("MyCollection")
+    .find()
+    .then((results) => {
+      if (results.items.length > 0) {
+        const firstItem = results.items[0];
+        console.log("First item:", firstItem);
+        $w("#textElement").text = firstItem.title;  // Example use
+      } else {
+        console.log("No items found");
+      }
+    })
+    .catch((err) => {
+      console.error(err);
+    });
+});
+// Insert new item
+wixData.insert("MyCollection", {
+  title: "New Entry",
+  description: "Sample Description"
+}).then((result) => {
+  console.log("Inserted:", result);
+});
+// Example of connecting collections
+import wixData from 'wix-data';
+
+// Create multi-reference fields to connect products and personas
+await wixData.create("Products", {
+  "name": "Fitnesswatch",
+  "type": "Electronics",
+  "price": 999,
+  "personas": ["persona1", "persona2"] // IDs of associated personas
+});
+
+await wixData.create("Personas", {
+  "name": "Alias",
+  "preferences": "High performance",
+  "interestedTypes": ["Electronics", "Supplements"],
+  "products": ["product1", "product2"] // IDs of associated products
+});
+// Function to get products by persona preferences
+async function getProductsByPersona(personaId) {
+  const persona = await wixData.get("Personas", personaId);
+  
+  return wixData.query("Products")
+    .hasSome("type", persona.interestedTypes)
+    .find();
+}
+
+// Function to get products by type
+async function getProductsByType(productType) {
+  return wixData.query("Products")
+    .eq("type", productType)
+    .find();
+}
+async function safeGetProducts(filterFn) {
+  try {
+    const results = await filterFn();
+    return results.items;
+  } catch (error) {
+    console.error("Failed to fetch products:", error);
+    return [];
+  }
+}
