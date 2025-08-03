@@ -1,67 +1,84 @@
 import wixData from 'wix-data';
 
-// Example: Read data from the collection
+// DOM element handling
 $w.onReady(function () {
-  wixData.query("MyCollection")
-    .find()
-    .then((results) => {
+  async function fetchData() {
+    try {
+      const results = await wixData.query("MyCollection")
+        .limit(50)
+        .find();
+      
       if (results.items.length > 0) {
         const firstItem = results.items[0];
         console.log("First item:", firstItem);
-        $w("#textElement").text = firstItem.title;  // Example use
+        $w("#textElement").text(firstItem.title);
       } else {
         console.log("No items found");
       }
-    })
-    .catch((err) => {
-      console.error(err);
-    });
-});
-// Insert new item
-wixData.insert("MyCollection", {
-  title: "New Entry",
-  description: "Sample Description"
-}).then((result) => {
-  console.log("Inserted:", result);
-});
-// Example of connecting collections
-import wixData from 'wix-data';
-
-// Create multi-reference fields to connect products and personas
-await wixData.create("Products", {
-  "name": "Fitnesswatch",
-  "type": "Electronics",
-  "price": 999,
-  "personas": ["persona1", "persona2"] // IDs of associated personas
-});
-
-await wixData.create("Personas", {
-  "name": "Alias",
-  "preferences": "High performance",
-  "interestedTypes": ["Electronics", "Supplements"],
-  "products": ["product1", "product2"] // IDs of associated products
-});
-// Function to get products by persona preferences
-async function getProductsByPersona(personaId) {
-  const persona = await wixData.get("Personas", personaId);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    }
+  }
   
-  return wixData.query("Products")
-    .hasSome("type", persona.interestedTypes)
-    .find();
+  fetchData();
+});
+
+// Collection operations
+async function insertItem(collectionName, itemData) {
+  try {
+    const result = await wixData.insert(collectionName, itemData);
+    console.log(`Successfully inserted into ${collectionName}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`Failed to insert into ${collectionName}:`, error);
+    throw error;
+  }
 }
 
-// Function to get products by type
-async function getProductsByType(productType) {
-  return wixData.query("Products")
-    .eq("type", productType)
-    .find();
-}
-async function safeGetProducts(filterFn) {
+// Multi-reference handling
+async function createProduct(productData, personaIds) {
   try {
-    const results = await filterFn();
+    const result = await wixData.create("Products", {
+      ...productData,
+      personas: personaIds.map(id => wixData.filterByField("Personas", "_id", id))
+    });
+    return result;
+  } catch (error) {
+    console.error("Failed to create product:", error);
+    throw error;
+  }
+}
+
+// Query functions
+async function getProductsByPersona(personaId) {
+  try {
+    const persona = await wixData.get("Personas", personaId);
+    if (!persona) {
+      throw new Error(`Persona with ID ${personaId} not found`);
+    }
+    
+    const query = wixData.query("Products")
+      .hasSome("type", persona.interestedTypes)
+      .limit(50)
+      .sortby("_createdDate", "desc");
+    
+    const results = await query.find();
     return results.items;
   } catch (error) {
-    console.error("Failed to fetch products:", error);
+    console.error(`Failed to get products for persona ${personaId}:`, error);
+    return [];
+  }
+}
+
+async function getProductsByType(productType) {
+  try {
+    const results = await wixData.query("Products")
+      .eq("type", productType)
+      .limit(50)
+      .find();
+    return results.items;
+  } catch (error) {
+    console.error(`Failed to get products by type ${productType}:`, error);
     return [];
   }
 }
